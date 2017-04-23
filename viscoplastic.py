@@ -67,7 +67,11 @@ delp, delv = split(test)
 dp, dv = split(du)
 delta = Identity(2)
 
-rho, mu, lambada, k_fluid, B_fluid = 1450.0, 400000.0, 1e6, 250, 0.00001
+rho = 1450.50
+mu = 400000.0
+lambada = 1e6
+k_fluid = 250
+B_fluid = 0.00001
 
 II = as_tensor(1.0/2.0 * sym(grad(v))[m,n] * sym(grad(v))[m,n] + 0.000001, ())
 I = as_tensor(sym(grad(v))[k,k], ())
