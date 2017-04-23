@@ -100,3 +100,6 @@ ENV/
 # Output files
 *vtu
 *pvd
+
+# Swap files
+*.swp
