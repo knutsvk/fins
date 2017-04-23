@@ -89,7 +89,7 @@ Gain = (dv[i].dx(i)*delp + rho/dt*dv[i]*delv[i] \
         / (pi*S*(2*B_fluid**2+S)) * sym(grad(v))[k,j] * delv[j].dx(k) \
         + 2*k_fluid*2**0.5/(pi*S**0.5)*atan(S**0.5/(2**0.5*B_fluid)) \
         * sym(grad(dv))[k,j] * delv[j].dx(k)) * dv_
-pwd = './abali/'
+pwd = './viscoplastic/'
 file_p = File(pwd + 'pressure.pvd')
 file_v = File(pwd + 'velocity.pvd')
 
