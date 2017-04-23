@@ -1,18 +1,7 @@
 from fenics import *
-set_log_level(ERROR)
 
-xlength = 5.0 # m
-ylength = 1.0 # m
-mesh_ = RectangleMesh(Point(0, -ylength/2.0), Point(xlength, ylength/2.0), 100, 20)
-class Cut(SubDomain):
-    def inside(self, x, on_boundary):
-        return x[0]<xlength/2.0 and (x[1]>+ylength/4.0 or x[1]<-ylength/5.0)
-
-domain = CellFunction('size_t', mesh_)
-domain.set_all(0)
-to_be_cut = Cut()
-to_be_cut.mark(domain, 1)
-mesh = SubMesh(mesh_, domain, 0)
+Nx = Ny = 32
+mesh = UnitSquareMesh(Nx, Ny)
 
 scalar_element = FiniteElement('P', triangle, 1)
 vector_element = VectorElement('P', triangle, 2)
@@ -20,13 +9,9 @@ mixed_element = MixedElement([scalar_element, vector_element])
 Space = FunctionSpace(mesh, mixed_element)
 
 left = CompiledSubDomain('near(x[0], 0.0) && on_boundary')
-right = CompiledSubDomain('near(x[0], l) && on_boundary', l=xlength)
-bottom1 = CompiledSubDomain('x[0] > xl/2.0 && near(x[1], -yl/2.0)', xl=xlength, yl=ylength)
-bottom2 = CompiledSubDomain('x[0] < xl/2.0 && x[1] < -yl/5.0', xl=xlength, yl=ylength)
-top1 = CompiledSubDomain('x[0] > xl/2.0 && near(x[1], yl/2.0)', xl=xlength, yl=ylength)
-top2 = CompiledSubDomain('x[0] < xl/2.0 && x[1] > yl/4.0', xl=xlength, yl=ylength)
-opening1 = CompiledSubDomain('near(x[0], xl/2.0) && x[1] < -yl/5.0', xl=xlength, yl=ylength)
-opening2 = CompiledSubDomain('near(x[0], xl/2.0) && x[1] > yl/4.0', xl=xlength, yl=ylength)
+right = CompiledSubDomain('near(x[0], 1.0) && on_boundary')
+bottom = CompiledSubDomain('near(x[1], 0.0) && on_boundary')
+top = CompiledSubDomain('near(x[1], 1.0) && on_boundary')
 
 facets = FacetFunction('size_t', mesh)
 cells = CellFunction('size_t', mesh)
@@ -34,26 +19,22 @@ da_ = Measure('ds', domain=mesh, subdomain_data=facets)
 dv_ = Measure('dx', domain=mesh, subdomain_data=cells)
 
 v_noslip = Constant((0, 0))
-pL = Expression('100000.0 + 1000.0*t', t=0.0, degree=1)
-pR = Constant('100000.0')
+pL = Constant('1.0')
+pR = Constant('0.0')
 p_bc1 = DirichletBC(Space.sub(0), pL, left)
 p_bc2 = DirichletBC(Space.sub(0), pR, right)
-p_bc3 = DirichletBC(Space.sub(0), pR, opening1)
-p_bc4 = DirichletBC(Space.sub(0), pR, opening2)
-v_bc1 = DirichletBC(Space.sub(1), v_noslip, bottom1)
-v_bc2 = DirichletBC(Space.sub(1), v_noslip, bottom2)
-v_bc3 = DirichletBC(Space.sub(1), v_noslip, top1)
-v_bc4 = DirichletBC(Space.sub(1), v_noslip, top2)
-v_bc5 = DirichletBC(Space.sub(1).sub(1), 0, left)
-v_bc6 = DirichletBC(Space.sub(1).sub(1), 0, right)
+v_bc1 = DirichletBC(Space.sub(1), v_noslip, bottom)
+v_bc2 = DirichletBC(Space.sub(1), v_noslip, top)
+v_bc3 = DirichletBC(Space.sub(1).sub(1), 0, left)
+v_bc4 = DirichletBC(Space.sub(1).sub(1), 0, right)
 
-bc = [p_bc1, p_bc2, p_bc3, p_bc4, v_bc1, v_bc2, v_bc3, v_bc4, v_bc5, v_bc6]
-u_init = Expression(('p0', '0.0', '0.0'), p0=100000.0, degree=2)
+bc = [p_bc1, p_bc2, v_bc1, v_bc2, v_bc3, v_bc4]
+u_init = Expression(('p0', '0.0', '0.0'), p0=0.0, degree=2)
 
 i, j, k, l, m, n = indices(6)
 t = 0.0
-t_end = 10.0
-dt = 0.1
+t_end = 1.0
+dt = 1.0e-4
 
 test = TestFunction(Space)
 du = TrialFunction(Space)
@@ -67,11 +48,11 @@ delp, delv = split(test)
 dp, dv = split(du)
 delta = Identity(2)
 
-rho = 1450.50
-mu = 400000.0
-lambada = 1e6
-k_fluid = 250
-B_fluid = 0.00001
+rho = 1.0
+mu = 1.0
+lambada = 0
+k_fluid = 0.3
+B_fluid = 0.001
 
 II = as_tensor(1.0/2.0 * sym(grad(v))[m,n] * sym(grad(v))[m,n] + 0.000001, ())
 I = as_tensor(sym(grad(v))[k,k], ())
@@ -101,7 +82,6 @@ tic()
 while t < t_end:
     t += dt
     print('time: ', t)
-    pL.t = t
     solve(Form==0, u, bc, J=Gain, \
             solver_parameters={"newton_solver":{ \
             "linear_solver":"mumps", "relative_tolerance":1e-3}},
@@ -119,7 +99,7 @@ while t < t_end:
             solver_type="mumps", \
             form_compiler_parameters={"cpp_optimize": True, \
             "representation": "quadrature", "quadrature_degree": 2})
-    print('sigma12: ', sigma_(xlength/2, ylength/4)[1], ' Pa')
+    print('sigma12: ', sigma_(0.5, 0.5)[1], ' Pa')
     u0.assign(u)
 print('it took ', toc(), ' seconds')
 
