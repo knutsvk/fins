@@ -96,3 +96,7 @@ ENV/
 
 # mkdocs documentation
 /site
+
+# Output files
+*vtu
+*pvd
