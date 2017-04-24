@@ -34,7 +34,7 @@ u_init = Expression(('p0', '0.0', '0.0'), p0=0.0, degree=2)
 i, j, k, l, m, n = indices(6)
 t = 0.0
 t_end = 1.0
-dt = 1.0e-4
+dt = 0.1
 
 test = TestFunction(Space)
 du = TrialFunction(Space)
