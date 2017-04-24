@@ -1,7 +1,9 @@
 from fenics import *
+from rheology import Newtonian, Sigmoid, Papabing
+set_log_level(ERROR)
 
-Nx = Ny = 32
-mesh = UnitSquareMesh(Nx, Ny)
+nx = ny = 32
+mesh = UnitSquareMesh(nx, ny)
 
 scalar_element = FiniteElement('P', triangle, 1)
 vector_element = VectorElement('P', triangle, 2)
@@ -21,6 +23,7 @@ dv_ = Measure('dx', domain=mesh, subdomain_data=cells)
 v_noslip = Constant((0, 0))
 pL = Constant('1.0')
 pR = Constant('0.0')
+
 p_bc1 = DirichletBC(Space.sub(0), pL, left)
 p_bc2 = DirichletBC(Space.sub(0), pR, right)
 v_bc1 = DirichletBC(Space.sub(1), v_noslip, bottom)
@@ -29,12 +32,11 @@ v_bc3 = DirichletBC(Space.sub(1).sub(1), 0, left)
 v_bc4 = DirichletBC(Space.sub(1).sub(1), 0, right)
 
 bc = [p_bc1, p_bc2, v_bc1, v_bc2, v_bc3, v_bc4]
-u_init = Expression(('p0', '0.0', '0.0'), p0=0.0, degree=2)
+u_init = Expression(('1.0-x[0]', '0.0', '0.0'), degree=1)
 
-i, j, k, l, m, n = indices(6)
 t = 0.0
 t_end = 1.0
-dt = 0.1
+dt = 0.05
 
 test = TestFunction(Space)
 du = TrialFunction(Space)
@@ -46,60 +48,58 @@ p0, v0 = split(u0)
 p, v = split(u)
 delp, delv = split(test)
 dp, dv = split(du)
-delta = Identity(2)
 
 rho = 1.0
 mu = 1.0
-lambada = 0
-k_fluid = 0.3
-B_fluid = 0.001
+tau_y = 0.3
+eps = 1e-4
 
-II = as_tensor(1.0/2.0 * sym(grad(v))[m,n] * sym(grad(v))[m,n] + 0.000001, ())
-I = as_tensor(sym(grad(v))[k,k], ())
+fluid = Newtonian(rho, mu)
+fluid = Papabing(rho, mu, tau_y, eps)
+fluid = Sigmoid(rho, mu, tau_y, eps)
 
-Form = (v[i].dx(i)*delp + rho/dt*(v-v0)[i]*delv[i] \
-        + rho*v[j]*v[i].dx(j)*delv[i] + p.dx(i)*delv[i] \
-        + lambada*I*delv[i].dx(i) \
-        + (2*mu + 2*k_fluid/pi/sqrt(II) * atan(sqrt(II)/B_fluid)) \
-        * sym(grad(v))[j,i] * delv[i].dx(j)) * dv_
-S = 2.0 * II
-Gain = (dv[i].dx(i)*delp + rho/dt*dv[i]*delv[i] \
-        + dv[j]*rho*v[i].dx(j)*delv[i] + v[j]*rho*dv[i].dx(j)*delv[i] \
-        + dp.dx(i)*delv[i] + lambada*dv[k].dx(k)*delv[i].dx(i) \
-        + 2*mu*sym(grad(dv))[k,j]*delv[j].dx(k) \
-        - 2*k_fluid*2**0.5/(pi*S**1.5)*sym(grad(v))[i,l] \
-        * sym(grad(dv))[i,l]*atan(S**0.5/(2**0.5*B_fluid)) \
-        * sym(grad(v))[k,j]*delv[j].dx(k) \
-        + 4*B_fluid*k_fluid*sym(grad(v))[m,n] * sym(grad(dv))[m,n] \
-        / (pi*S*(2*B_fluid**2+S)) * sym(grad(v))[k,j] * delv[j].dx(k) \
-        + 2*k_fluid*2**0.5/(pi*S**0.5)*atan(S**0.5/(2**0.5*B_fluid)) \
-        * sym(grad(dv))[k,j] * delv[j].dx(k)) * dv_
+def rate_of_strain(u):
+    return sym(nabla_grad(u))
+
+II = 0.5 * inner(rate_of_strain(v), rate_of_strain(v)) + 1e-12
+
+Form = (dot(div(v), delp) + rho / dt * dot((v - v0), delv)  \
+        + rho * dot(dot(v, grad(v)), delv) + dot(grad(p), delv) \
+        + fluid.apparent_viscosity(II) * inner(rate_of_strain(v), grad(delv))) * dv_
+
+Gain = (dot(div(dv), delp) + rho / dt * dot(dv, delv) \
+        + rho * dot(dot(dv, grad(v)), delv) \
+        + rho * dot(dot(v, grad(dv)), delv) \
+        + dot(grad(dp), delv) \
+        + fluid.apparent_viscosity(II) * inner(rate_of_strain(dv), grad(delv)) \
+        + fluid.differentiated_apparent_viscosity(II) \
+        * inner(rate_of_strain(v), rate_of_strain(dv)) \
+        * inner(rate_of_strain(v), grad(delv))) * dv_
+
 pwd = './viscoplastic/'
 file_p = File(pwd + 'pressure.pvd')
 file_v = File(pwd + 'velocity.pvd')
 
-tic()
+step = 0
+print('step\t time\t umax\t change')
 while t < t_end:
+    step += 1
     t += dt
-    print('time: ', t)
     solve(Form==0, u, bc, J=Gain, \
-            solver_parameters={"newton_solver":{ \
-            "linear_solver":"mumps", "relative_tolerance":1e-3}},
+            solver_parameters={"newton_solver":{"relative_tolerance":1e-5}},
             form_compiler_parameters={"cpp_optimize": True, \
                     "representation": "quadrature", "quadrature_degree": 2})
+
     file_p << (u.split()[0], t)
     file_v << (u.split()[1], t)
-    II_ = project(II, FunctionSpace(mesh, 'P', 1), \
-            solver_type="mumps", \
-            form_compiler_parameters={"cpp_optimize": True, \
-            "representation": "quadrature", "quadrature_degree": 2})
-    sigma = as_tensor(-p*delta[j,i] + (2.0*mu + 2.0*k_fluid/pi/sqrt(II_) \
-            * atan(sqrt(II_)/B_fluid)) * sym(grad(v))[j,i], (j,i))
-    sigma_ = project(sigma, TensorFunctionSpace(mesh, 'P', 1), \
-            solver_type="mumps", \
-            form_compiler_parameters={"cpp_optimize": True, \
-            "representation": "quadrature", "quadrature_degree": 2})
-    print('sigma12: ', sigma_(0.5, 0.5)[1], ' Pa')
-    u0.assign(u)
-print('it took ', toc(), ' seconds')
 
+    II_ = project(II, FunctionSpace(mesh, 'P', 1), \
+            form_compiler_parameters={"cpp_optimize": True, \
+            "representation": "quadrature", "quadrature_degree": 2})
+    sigma = -p * Identity(2) + fluid.apparent_viscosity(II_) * rate_of_strain(v)
+    sigma_ = project(sigma, TensorFunctionSpace(mesh, 'P', 1), \
+            form_compiler_parameters={"cpp_optimize": True, \
+            "representation": "quadrature", "quadrature_degree": 2})
+
+    print('%d\t %.3f\t %.3f\t %.2e' % (step, t, u(0.5, 0.5)[1], u(0.5, 0.5)[1] - u0(0.5, 0.5)[1]))
+    u0.assign(u)
