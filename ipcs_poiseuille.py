@@ -1,7 +1,7 @@
 from __future__ import print_function
 from fenics import *
 import numpy as np
-from navier_stokes import define_functions, variational_problem, advance_ipcs
+from ipcs import define_functions, variational_problem, advance_ipcs
 
 T = 10.0            # final time
 num_steps = 500     # number of time steps
@@ -36,7 +36,7 @@ A1, A2, A3, L1, L2, L3 = variational_problem(dt, rho, mu, f, \
         u_n, p_n, u_, p_, mesh, V, Q, bcu, bcp)
 
 # Create VTK file for saving solution
-vtkfile = File('poiseuille/solution.pvd')
+vtkfile = File('output/velocity_ipcs.pvd')
 
 # Time-stepping
 t = 0

@@ -76,9 +76,9 @@ Gain = (dot(div(dv), delp) + rho / dt * dot(dv, delv) \
         * inner(rate_of_strain(v), rate_of_strain(dv)) \
         * inner(rate_of_strain(v), grad(delv))) * dv_
 
-pwd = './viscoplastic/'
-file_p = File(pwd + 'pressure.pvd')
-file_v = File(pwd + 'velocity.pvd')
+pwd = './output/'
+file_p = File(pwd + 'ntgj_pressure.pvd')
+file_v = File(pwd + 'ntgj_velocity.pvd')
 
 step = 0
 print('step\t time\t umax\t change')
