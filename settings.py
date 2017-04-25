@@ -1,2 +1,2 @@
-nx = ny = 32
-fluid = 'Newtonian'
+reltol = 1e-5
+maxiter = 100
