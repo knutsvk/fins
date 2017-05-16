@@ -8,7 +8,7 @@ class Smooth():
         self.space = self.make_space()
         self.bc = self.boundary_conditions(limits, dp)
         self.ic = self.initial_conditions(limits, dp)
-        self.force = self.external_forces(limits, dp)
+        self.f = self.external_forces(limits, dp)
         self.name = 'smooth'
 
     def make_mesh(self, nx, ny, limits): 
