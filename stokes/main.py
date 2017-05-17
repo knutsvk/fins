@@ -1,6 +1,5 @@
 import fenics
 import pde
-import rheology
 from settings import *
 import testcases
 
@@ -12,14 +11,14 @@ algorithm = pde.GSP(problem, alpha, nu, U)
 
 outdir = './output/'
 file_p = fenics.File(outdir + problem.name + '_' + 'pressure.pvd')
-file_v = fenics.File(outdir + problem.name + '_' + 'velocity.pvd')
+file_u = fenics.File(outdir + problem.name + '_' + 'velocity.pvd')
 
 algorithm.solve(U)
 
-pressure, velocity = U.split(deepcopy=True)
+p, u = U.split(deepcopy=True)
 
-file_p << (pressure)
-file_v << (velocity)
+file_p << p
+file_u << u
 
-# TODO: Check that p - (-x+y) = C
-# TODO: Check that div(u) = 0
+error_norms = problem.compute_errors(U)
+assert max(max(error_norms)) < 1e-10
