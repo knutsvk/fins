@@ -36,20 +36,6 @@ def run_iterative_lid(n=128):
     algorithm.solve(U)
     problem.write_file(U, n, n)
 
-def run_direct_3d(n=8):
-    problem = testcases.Sinflow3D(n, n, n)
-    algorithm = pde.direct(problem, 0, 1)
-    U = problem.define_functions()
-    algorithm.solve(U)
-    problem.write_file(U, n, n)
-
-def run_iterative_3d(n=8):
-    problem = testcases.Sinflow3D(n, n, n)
-    algorithm = pde.iterative(problem, 0, 1)
-    U = problem.define_functions()
-    algorithm.solve(U)
-    problem.write_file(U, n, n)
-
 def test_direct_smooth():
     print('Running test_direct_smooth()')
     for nx, ny in [(3,3), (5,3), (3,5), (20,20)]:
